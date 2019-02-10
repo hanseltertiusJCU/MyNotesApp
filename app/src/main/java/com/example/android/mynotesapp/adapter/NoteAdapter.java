@@ -2,6 +2,7 @@ package com.example.android.mynotesapp.adapter;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.net.Uri;
 import android.support.annotation.NonNull;
 import android.support.v7.widget.CardView;
 import android.support.v7.widget.RecyclerView;
@@ -11,11 +12,13 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 
 import com.example.android.mynotesapp.CustomOnItemClickListener;
-import com.example.android.mynotesapp.NoteAddUpdateActivity;
+import com.example.android.mynotesapp.FormAddUpdateActivity;
 import com.example.android.mynotesapp.R;
 import com.example.android.mynotesapp.entity.Note;
 
 import java.util.ArrayList;
+
+import static com.example.android.mynotesapp.db.DatabaseContract.NoteColumns.CONTENT_URI;
 
 public class NoteAdapter extends RecyclerView.Adapter<NoteAdapter.NoteViewHolder> {
 
@@ -40,22 +43,6 @@ public class NoteAdapter extends RecyclerView.Adapter<NoteAdapter.NoteViewHolder
         notifyDataSetChanged();
     }
 
-    public void addItem(Note note){
-        this.listNotes.add(note);
-        notifyItemInserted(listNotes.size() - 1);
-    }
-
-    public void updateItem(int position, Note note){
-        this.listNotes.set(position, note);
-        notifyItemChanged(position, note);
-    }
-
-    public void removeItem(int position){
-        this.listNotes.remove(position);
-        notifyItemRemoved(position);
-        notifyItemRangeChanged(position, listNotes.size());
-    }
-
     @NonNull
     @Override
     public NoteViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -66,16 +53,21 @@ public class NoteAdapter extends RecyclerView.Adapter<NoteAdapter.NoteViewHolder
 
     @Override
     public void onBindViewHolder(@NonNull NoteViewHolder holder, int position) {
-        holder.tvTitle.setText(listNotes.get(position).getTitle());
-        holder.tvDate.setText(listNotes.get(position).getDate());
-        holder.tvDescription.setText(listNotes.get(position).getDescription());
+        holder.tvTitle.setText(getListNotes().get(position).getTitle());
+        holder.tvDate.setText(getListNotes().get(position).getDate());
+        holder.tvDescription.setText(getListNotes().get(position).getDescription());
         holder.cvNote.setOnClickListener(new CustomOnItemClickListener(position, new CustomOnItemClickListener.OnItemClickCallback() {
             @Override
             public void onItemClicked(View view, int position) {
-                Intent intent = new Intent(activity, NoteAddUpdateActivity.class);
-                intent.putExtra(NoteAddUpdateActivity.EXTRA_POSITION, position);
-                intent.putExtra(NoteAddUpdateActivity.EXTRA_NOTE, listNotes.get(position));
-                activity.startActivityForResult(intent, NoteAddUpdateActivity.REQUEST_UPDATE);
+                Intent intent = new Intent(activity, FormAddUpdateActivity.class);
+
+                // Set intent dengan data uri row note by id
+                // content://com.example.android.mynotesapp/note/id
+                Uri uri = Uri.parse(CONTENT_URI +  "/" + getListNotes().get(position).getId()); // id nya itu sbnrnya bedasarkan posisi dari Adapter
+                intent.setData(uri); // Set URI ke dalam Intent
+                intent.putExtra(FormAddUpdateActivity.EXTRA_POSITION, position);
+                intent.putExtra(FormAddUpdateActivity.EXTRA_NOTE, listNotes.get(position));
+                activity.startActivityForResult(intent, FormAddUpdateActivity.REQUEST_UPDATE); // URI dikirim ke FormAddUpdateActivity dan URI tsb tepatnya akan digunakan di onCreate method
             }
         }));
     }

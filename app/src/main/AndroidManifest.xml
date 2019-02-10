@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.android.mynotesapp">
+    
+    <permission android:name="com.example.android.mynotesapp.READ_DATABASE" android:protectionLevel="normal"/>
+    <permission android:name="com.example.android.mynotesapp.WRITE_DATABASE" android:protectionLevel="normal"/>
 
     <application
         android:allowBackup="true"
@@ -16,12 +19,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".NoteAddUpdateActivity"
-            android:parentActivityName=".MainActivity">
-            <meta-data
-                android:name="android.support.PARENT_ACTIVITY"
-                android:value=".MainActivity" />
-        </activity>
+        <activity android:name=".FormAddUpdateActivity"/>
+        <provider
+            android:authorities="com.example.android.mynotesapp"
+            android:name=".provider.NoteProvider"
+            android:exported="true"
+            android:readPermission="com.example.android.mynotesapp.READ_DATABASE"
+            android:writePermission="com.example.android.mynotesapp.WRITE_DATABASE"/>
     </application>
 
 </manifest>

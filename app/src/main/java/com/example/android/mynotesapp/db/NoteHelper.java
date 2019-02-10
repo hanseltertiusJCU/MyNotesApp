@@ -14,12 +14,12 @@ import java.util.ArrayList;
 import static android.provider.BaseColumns._ID;
 import static com.example.android.mynotesapp.db.DatabaseContract.NoteColumns.DATE;
 import static com.example.android.mynotesapp.db.DatabaseContract.NoteColumns.DESCRIPTION;
+import static com.example.android.mynotesapp.db.DatabaseContract.NoteColumns.TABLE_NAME;
 import static com.example.android.mynotesapp.db.DatabaseContract.NoteColumns.TITLE;
-import static com.example.android.mynotesapp.db.DatabaseContract.TABLE_NOTE;
 
 public class NoteHelper {
 
-    private static final String DATABASE_TABLE = TABLE_NOTE;
+    private static final String DATABASE_TABLE = TABLE_NAME;
     private static DatabaseHelper dataBaseHelper;
     private static NoteHelper INSTANCE;
 
@@ -53,7 +53,7 @@ public class NoteHelper {
     }
 
     // Method ini berguna untuk melakukan proses load data pada NoteHelper, menjalankan Read pada proses CRUD
-    public ArrayList<Note> getAllNotes(){
+    public ArrayList<Note> query(){
         ArrayList<Note> arrayList = new ArrayList<>();
         // Query method untuk mendapatkan data serta sort by ID in ascending order
         Cursor cursor = database.query(DATABASE_TABLE, null,
@@ -88,7 +88,7 @@ public class NoteHelper {
     }
 
     // Method tsb berguna untuk menjalankan proses penambahan data pada NoteHelper, menjalankan Create pada proses CRUD
-    public long insertNote(Note note){
+    public long insert(Note note){
         ContentValues args = new ContentValues();
         args.put(TITLE, note.getTitle());
         args.put(DESCRIPTION, note.getDescription());
@@ -97,7 +97,7 @@ public class NoteHelper {
     }
 
     // Method tsb berguna untuk menjalankan proses perubahan data pada NoteHelper, menjalankan Update pada proses CRUD
-    public int updateNote(Note note){
+    public int update(Note note){
         ContentValues args = new ContentValues();
         args.put(TITLE, note.getTitle());
         args.put(DESCRIPTION, note.getDescription());
@@ -106,7 +106,42 @@ public class NoteHelper {
     }
 
     // Method tsb berguna untuk menjalankan proses penghapusan data pada NoteHelper, menjalankan Delete pada proses CRUD
-    public int deleteNote(int id){
-        return database.delete(TABLE_NOTE, _ID + " = '" + id + "'", null);
+    public int delete(int id){
+        return database.delete(TABLE_NAME, _ID + " = '" + id + "'", null);
     }
+
+    // Method untuk ContentProvider
+    public Cursor queryByIdProvider(String id){
+        return database.query(DATABASE_TABLE
+                , null
+                , _ID + " = ?"
+                , new String[]{id}
+                , null
+                , null
+                , null);
+    }
+
+    public Cursor queryProvider(){
+        return database.query(DATABASE_TABLE
+                ,null
+                , null
+                , null
+                , null
+                , null
+                , _ID + " ASC");
+    }
+
+    public long insertProvider(ContentValues values){
+        return database.insert(DATABASE_TABLE, null, values);
+    }
+
+    public int updateProvider(String id, ContentValues values){
+        return database.update(DATABASE_TABLE, values, _ID + " = ?", new String[]{id});
+    }
+
+    public int deleteProvider(String id){
+        return database.delete(DATABASE_TABLE, _ID + " = ?", new String[]{id});
+    }
+
+
 }

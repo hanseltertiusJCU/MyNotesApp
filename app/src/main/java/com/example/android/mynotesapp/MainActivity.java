@@ -1,7 +1,12 @@
 package com.example.android.mynotesapp;
 
+import android.content.Context;
 import android.content.Intent;
+import android.database.ContentObserver;
+import android.database.Cursor;
 import android.os.AsyncTask;
+import android.os.Handler;
+import android.os.HandlerThread;
 import android.support.annotation.Nullable;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
@@ -13,23 +18,29 @@ import android.view.View;
 import android.widget.ProgressBar;
 
 import com.example.android.mynotesapp.adapter.NoteAdapter;
-import com.example.android.mynotesapp.db.NoteHelper;
 import com.example.android.mynotesapp.entity.Note;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 
+import static com.example.android.mynotesapp.db.DatabaseContract.NoteColumns.CONTENT_URI;
+import static com.example.android.mynotesapp.helper.MappingHelper.mapCursorToArrayList;
+
 // Method ini mempunyai 2 fungsi, yaitu:
 // - Menampilkan data dari database pada tabel Note
-// - Menerima nilai balik (result) dari setiap aksi dan proses yang dilakukan di NoteAddUpdateActivity
+// - Menerima nilai balik (result) dari setiap aksi dan proses yang dilakukan di FormAddUpdateActivity
 public class MainActivity extends AppCompatActivity implements View.OnClickListener, LoadNotesCallback {
 
     private RecyclerView rvNotes;
     private ProgressBar progressBar;
+
     private FloatingActionButton fabAdd;
     private static final String EXTRA_STATE = "EXTRA_STATE";
+
     private NoteAdapter adapter;
-    private NoteHelper noteHelper;
+
+    private static HandlerThread handlerThread;
+    private DataObserver myObserver;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,20 +55,23 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         rvNotes.setLayoutManager(new LinearLayoutManager(this));
         rvNotes.setHasFixedSize(true);
 
-        // Membuat Instance untuk NoteHelper
-        noteHelper = NoteHelper.getInstance(getApplicationContext());
-        // Membuka koneksi terhadap SQL
-        noteHelper.open();
-
         progressBar = findViewById(R.id.progressbar);
+
+        handlerThread = new HandlerThread("DataObserver");
+        handlerThread.start();
+        Handler handler = new Handler(handlerThread.getLooper());
+        myObserver = new DataObserver(handler, this);
+        getContentResolver().registerContentObserver(CONTENT_URI, true, myObserver);
+
         fabAdd = findViewById(R.id.fab_add);
         fabAdd.setOnClickListener(this);
 
         adapter = new NoteAdapter(this);
+
         rvNotes.setAdapter(adapter);
 
         if(savedInstanceState == null){
-            new LoadNotesAsync(noteHelper, this).execute();
+            new LoadNotesAsync(this, this).execute();
         } else {
             ArrayList<Note> list = savedInstanceState.getParcelableArrayList(EXTRA_STATE);
             if(list != null){
@@ -69,8 +83,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     @Override
     public void onClick(View view) {
         if(view.getId() == R.id.fab_add){
-            Intent intent = new Intent(MainActivity.this, NoteAddUpdateActivity.class);
-            startActivityForResult(intent, NoteAddUpdateActivity.REQUEST_ADD);
+            Intent intent = new Intent(MainActivity.this, FormAddUpdateActivity.class);
+            startActivityForResult(intent, FormAddUpdateActivity.REQUEST_ADD);
         }
     }
 
@@ -80,9 +94,16 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     @Override
-    public void postExecute(ArrayList<Note> notes) {
+    public void postExecute(Cursor notes) {
         progressBar.setVisibility(View.INVISIBLE);
-        adapter.setListNotes(notes);
+
+        ArrayList<Note> listNotes = mapCursorToArrayList(notes);
+        if(listNotes.size() > 0){
+            adapter.setListNotes(listNotes);
+        } else {
+            adapter.setListNotes(new ArrayList<Note>());
+            showSnackbarMessage("Tidak ada data saat ini");
+        }
     }
 
     @Override
@@ -91,15 +112,16 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         outState.putParcelableArrayList(EXTRA_STATE, adapter.getListNotes());
     }
 
-    private static class LoadNotesAsync extends AsyncTask<Void, Void, ArrayList<Note>>{
+    // Create class untuk AsyncTask
+    private static class LoadNotesAsync extends AsyncTask<Void, Void, Cursor>{
         // WeakReference digunakan karena AsyncTask akan dibuat dan dieksekusi scr bersamaan di method onCreate().
         // Selain itu, ketika Activity destroyed, Activity tsb dapat dikumpulkan oleh GarbageCollector, sehingga
         // dapat mencegah memory leak
-        private final WeakReference<NoteHelper> weakNoteHelper;
+        private final WeakReference<Context> weakContext;
         private final WeakReference<LoadNotesCallback> weakCallback;
 
-        private LoadNotesAsync(NoteHelper noteHelper, LoadNotesCallback callback){
-            weakNoteHelper = new WeakReference<>(noteHelper);
+        private LoadNotesAsync(Context context, LoadNotesCallback callback){
+            weakContext = new WeakReference<>(context);
             weakCallback = new WeakReference<>(callback);
         }
 
@@ -110,59 +132,36 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
 
         @Override
-        protected ArrayList<Note> doInBackground(Void... voids) {
-            return weakNoteHelper.get().getAllNotes();
+        protected Cursor doInBackground(Void... voids) {
+            Context context = weakContext.get();
+            // Untuk meretrieve semua data
+            return context.getContentResolver().query(CONTENT_URI, null, null, null, null); // Mengakses content resolver lalu memanggil method query dengan meneruskan URI ke content provider ->
+            // URI tsb akan dipakai ke method query di content provider
         }
 
         @Override
-        protected void onPostExecute(ArrayList<Note> notes) {
+        protected void onPostExecute(Cursor notes) {
             super.onPostExecute(notes);
             weakCallback.get().postExecute(notes);
         }
     }
 
-    // Method tsb berguna untuk mendapatkan hasil dari semua aksi yang dilakukan oleh NoteAddUpdateActivity (editor)
-    // dengan menerima data dari Intent bedasarkan request dan result code
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        // Cek jika intent itu ada
-        if(data != null){
-            // Terjadi ketika terdapat penambahan data pada NoteAddUpdateActivity
-            if(requestCode == NoteAddUpdateActivity.REQUEST_ADD){
-                if(resultCode == NoteAddUpdateActivity.RESULT_ADD){
-                    Note note = data.getParcelableExtra(NoteAddUpdateActivity.EXTRA_NOTE); // Membuat object Note baru dengan getParcelableExtra karena Note implement Parcelable
-                    adapter.addItem(note); // Manggil method addItem di NoteAdapter
-                    rvNotes.smoothScrollToPosition(adapter.getItemCount() - 1); // method ini digunakan agar recycler view akan melakukan smooth scrolling
-                    showSnackbarMessage("Satu item berhasil ditambahkan");
-                }
-            }
-            // Terjadi ketika terdapat perubahan atau penghapusan data pada NoteAddUpdateActivity
-            else if(requestCode == NoteAddUpdateActivity.REQUEST_UPDATE){
-                if(resultCode == NoteAddUpdateActivity.RESULT_UPDATE){
-                    Note note = data.getParcelableExtra(NoteAddUpdateActivity.EXTRA_NOTE);
-                    int position = data.getIntExtra(NoteAddUpdateActivity.EXTRA_POSITION, 0);
-                    adapter.updateItem(position, note); // Memanggil method updateItem di NoteAdapter, arg nya ada 2 yaitu position (item yg d update) dan note
-                    rvNotes.smoothScrollToPosition(position);
-                    showSnackbarMessage("Satu item berhasil diubah");
-                } else if(resultCode == NoteAddUpdateActivity.RESULT_DELETE){
-                    int position = data.getIntExtra(NoteAddUpdateActivity.EXTRA_POSITION, 0);
-                    adapter.removeItem(position); // Memanggil method deleteItem di NoteAdapter, argnya yaitu position (item yg d delete)
-                    showSnackbarMessage("Satu item berhasil dihapus");
-                }
-            }
-        }
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        // Menutup koneksi terhadap SQL
-        noteHelper.close();
-    }
-
     // Method tsb berguna untuk membuat Snackbar
     private void showSnackbarMessage(String message){
         Snackbar.make(rvNotes, message, Snackbar.LENGTH_SHORT).show();
+    }
+
+    public static class DataObserver extends ContentObserver{
+        final Context context;
+        public DataObserver(Handler handler, Context context){
+            super(handler);
+            this.context = context;
+        }
+
+        @Override
+        public void onChange(boolean selfChange) {
+            super.onChange(selfChange);
+            new LoadNotesAsync(context, (LoadNotesCallback) context).execute();
+        }
     }
 }
