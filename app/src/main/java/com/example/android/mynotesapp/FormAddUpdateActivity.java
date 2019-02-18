@@ -91,10 +91,9 @@ public class FormAddUpdateActivity extends AppCompatActivity implements View.OnC
         if(isEdit){
             actionBarTitle = "Ubah";
             btnTitle = "Update";
-            if(note != null){
-                edtTitle.setText(note.getTitle());
-                edtDescription.setText(note.getDescription());
-            }
+
+            edtTitle.setText(note.getTitle());
+            edtDescription.setText(note.getDescription());
         } else {
             actionBarTitle = "Tambah";
             btnTitle = "Simpan";
@@ -117,8 +116,8 @@ public class FormAddUpdateActivity extends AppCompatActivity implements View.OnC
             boolean isEmpty = false;
 
             if(TextUtils.isEmpty(title)){
+                isEmpty = true;
                 edtTitle.setError("Field cannot be blank");
-                return;
             }
 
             Intent intent = new Intent();
@@ -134,16 +133,18 @@ public class FormAddUpdateActivity extends AppCompatActivity implements View.OnC
                 values.put(DESCRIPTION, description);
 
                 if(isEdit){ // isEdit menjadi true ketika mengirimkan object listNotes {@link NoteAdapter -> MainActivity}
+                    // Gunakan uri dari intent activity ini
+                    // content://com.dicoding.picodiploma.mynotesapp/note/id
                     getContentResolver().update(getIntent().getData(), values, null, null);
                     Toast.makeText(FormAddUpdateActivity.this, "Satu item berhasil diedit", Toast.LENGTH_SHORT).show();
 
                     finish();
                 } else {
-
                     values.put(DATE, getCurrentDate());
                     note.setDate(getCurrentDate());
+                    // Gunakan content uri untuk insert
+                    // content://com.dicoding.picodiploma.mynotesapp/note/
                     Toast.makeText(FormAddUpdateActivity.this, "Satu item berhasil disimpan", Toast.LENGTH_SHORT).show();
-
                     getContentResolver().insert(CONTENT_URI, values);
 
                     finish();

@@ -2,6 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.android.mynotesapp">
     
+    <!-- Mendeklarasikan permission untuk mengizinkan app lain untuk akses data dari app ini -->
     <permission android:name="com.example.android.mynotesapp.READ_DATABASE" android:protectionLevel="normal"/>
     <permission android:name="com.example.android.mynotesapp.WRITE_DATABASE" android:protectionLevel="normal"/>
 
@@ -20,6 +21,7 @@
             </intent-filter>
         </activity>
         <activity android:name=".FormAddUpdateActivity"/>
+        <!-- Mendeklarasikan NoteProvider untuk dapat menghubungkan database ke app lain -->
         <provider
             android:authorities="com.example.android.mynotesapp"
             android:name=".provider.NoteProvider"
